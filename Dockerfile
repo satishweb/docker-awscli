@@ -11,7 +11,6 @@ RUN apt-get -y update \
 	&& pip install awscli \
 	&& apt-get -y purge build-essential \
 	&& apt-get -qy autoremove --purge \
-	&& dpkg --list |grep "^rc" | cut -d " " -f 3 | xargs sudo dpkg --purge \
 	&& rm -rf /var/cache/apt/archives/*deb
 ENTRYPOINT ["/usr/local/bin/aws"]
 CMD ["/usr/local/bin/aws"]
