@@ -1,4 +1,5 @@
 #!/bin/bash
+# Author: Satish Gaikwad <satish@satishweb.com>
 # For manual push to docker hub, pass "manual" as parameter to this script
 sDir=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 logFile=$sDir/build.log

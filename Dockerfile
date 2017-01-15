@@ -1,5 +1,6 @@
 #!/bin/bash
 # Ubuntu + awscli Docker image
+# Author: Satish Gaikwad <satish@satishweb.com>
 
 # We will always take latest stable ubuntu docker image as base image
 FROM ubuntu
