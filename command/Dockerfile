@@ -1,5 +1,7 @@
 #!/bin/bash
 # Ubuntu + awscli Docker image
+# Type: Command Based (Direct command execution upon container launch)
+# Use: Manual commandline purpose
 # Author: Satish Gaikwad <satish@satishweb.com>
 
 # We will always take latest stable ubuntu docker image as base image
