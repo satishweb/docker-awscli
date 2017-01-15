@@ -13,4 +13,4 @@ RUN apt-get -y update \
 	&& apt-get -qy autoremove --purge \
 	&& rm -rf /var/cache/apt/archives/*deb
 ENTRYPOINT ["/usr/local/bin/aws"]
-CMD ["/usr/local/bin/aws"]
+CMD ["/bin/bash"]
