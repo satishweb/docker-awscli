@@ -7,9 +7,9 @@ Simple and lightweight ubuntu based Docker Image for Amazon web services command
 Image Type  | Tag prefix | Usage
 --------------- | --------|-------------
 Command | NONE | This image runs the aws command when launched with docker run with at least one parameter
-| | Command Image type has default tags without any prefixes. For example "latest", "1.11.36".
+ | | Command Image type has default tags without any prefixes. For example "latest", "1.11.36".
 Shell | shell- | This image is used for scripting use/automations where shell based command execution is needed
-| | Shell Image type has default tags with prefix shell-. For example "shell-latest", "shell-1.11.36".
+ | | Shell Image type has default tags with prefix shell-. For example "shell-latest", "shell-1.11.36".
 
 ### AWSCLI Versions ###
 ************
