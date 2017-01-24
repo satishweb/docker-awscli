@@ -49,6 +49,10 @@ RUN cd /tmp; \
 	# Installing groff with apt-get installs way too many unwanted packages making image size bigger
 	# Installing groff manually with only required libs will keep image size reasonable
 	apt-get download groff groff-base && dpkg --force-depends -i *.deb ; rm -rf /tmp/*deb ;\
+	# Install missing dependancies for existing packages.
+	apt-get -f install ; \
+	# Install ssh commands.
+	apt-get install sshcommand ; \
 	# Docker build command fails due to dpkg dependancy errors, we need to ignore errors here hence we exit with code 0 to let docker think this RUN was successful.
 	exit 0
 
