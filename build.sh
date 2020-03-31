@@ -51,7 +51,7 @@ __processParams() {
       -t|--git-tag)    shift
                        [[ ! $1 ]] && __usage "Git tag name missing"
                        tagName="$(echo $1\
-                       |sed -e 's/^[ \t]*//;s/[ \t]*$//;s/ /-/g'\
+                       |sed -e 's/t/CHART/g;s/^[ \t]*//;s/[ \t]*$//;s/ /-/g;s/CHART/t/g'\
                        |sed $'s/[^[:print:]\t]//g')"
                        imageTags+=" $tagName"
                        ;;
@@ -69,6 +69,7 @@ __processParams() {
       * )              __usage "Missing or incorrect parameters"
     esac
     shift
+    imageTags=$(echo $imageTags|sed -e 's/^ //')
   done
   [[ ! $platforms ]] && \
   platforms="linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6"
