@@ -15,18 +15,18 @@ linux/arm/v7 |
 Image Type  | Tag prefix | Usage
 --------------- | --------|-------------
 Command | NONE | This image runs the aws command when launched with docker run with at least one parameter
- | | Command Image type has default tags without any prefixes. For example "latest", "1.11.36".
+ | | Command Image type has default tags without any prefixes. For example "latest", "1.18.32".
 Shell | shell- | This image is used for scripting use/automations where shell based command execution is needed
- | | Shell Image type has default tags with prefix shell-. For example "shell-latest", "shell-1.11.36".
+ | | Shell Image type has default tags with prefix shell-. For example "shell-latest", "shell-1.18.32".
 
 ### AWSCLI Versions ###
 ************
 TAG | AWSCLI Version | Docker Pull Command
 --------------- | -------------|---------
-**[latest](https://github.com/satishweb/docker-awscli/blob/master/command/Dockerfile)** | 1.11.36 |  `docker pull satishweb/awscli`
-**[shell-latest](https://github.com/satishweb/docker-awscli/blob/master/shell/Dockerfile)** | 1.11.36 |  `docker pull satishweb/awscli:shell-latest`
-**[1.11.36](https://github.com/satishweb/docker-awscli/blob/1.11.36/command/Dockerfile)**| 1.11.36 |  `docker pull satishweb/awscli:1.11.36`
-**[shell-1.11.36](https://github.com/satishweb/docker-awscli/blob/shell-1.11.36/shell/Dockerfile)**| 1.11.36 |  `docker pull satishweb/awscli:shell-1.11.36`
+**[latest](https://github.com/satishweb/docker-awscli/blob/master/command/Dockerfile)** | 1.18.32 |  `docker pull satishweb/awscli`
+**[shell-latest](https://github.com/satishweb/docker-awscli/blob/master/shell/Dockerfile)** | 1.18.32 |  `docker pull satishweb/awscli:shell-latest`
+**[1.18.32](https://github.com/satishweb/docker-awscli/blob/1.18.32/command/Dockerfile)**| 1.18.32 |  `docker pull satishweb/awscli:1.18.32`
+**[shell-1.18.32](https://github.com/satishweb/docker-awscli/blob/shell-1.18.32/shell/Dockerfile)**| 1.18.32 |  `docker pull satishweb/awscli:shell-1.18.32`
 
 ### Command Image Type Usage ###
 ***********
