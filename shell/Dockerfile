@@ -6,7 +6,7 @@
 
 # To know contents of awscli Dockerfile, please open source repository on github for this docker image.
 # Docker hub somehow can not understand how to handle multiple Dockerfiles for display on the Docker hub image page.
-FROM satishweb/awscli
+FROM satishweb/awscli:draft-latest
 MAINTAINER Satish Gaikwad <satish@satishweb.com>
 
 # Lets modify entrypoint.sh to remove aws command reference.

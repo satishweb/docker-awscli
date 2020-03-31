@@ -1,125 +1,165 @@
 #!/bin/bash
 # Author: Satish Gaikwad <satish@satishweb.com>
-# For manual push to docker hub, pass "manual" as 2nd parameter to this script
 
-##############
-## INIT
-##############
-sDir=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-logFile=$sDir/build.log
-image="satishweb/awscli"
-
-# Get params
-buildType=$1
-imgPush=#2
-
-##############
 ## Functions
-##############
-
-# Usage function
-usage() {
-    echo "Usage: $0 <BuildType> <ImagePush> "
-    echo "      BuildType: command|shell  -- Optional (Def: all)"
-    echo "      ImagePush: manual|auto -- Optional (Def: manual)"
-    exit 1
+__usage() {
+  if [[ "$1" != "" ]]; then
+      echo "ERR: $1 "
+  fi
+  echo "Usage: $0
+          -i|--image-name <DockerImageName>
+          -p|--platforms <PlatformsList>
+          -w|--work-dir <WorkDirPath>
+          -t|--git-tag <TagName(Required)>
+          --mark-latest
+          --push-images
+          --push-git-tags
+          --no-cache
+          -h|--help"
+  echo "Description:"
+  echo "  -i|--image-name : Name of the docker image."
+  echo "    e.g. satishweb/imagename. (Def: current directory name)"
+  echo "  -p|--platforms  : list of platforms to build for."
+  echo "    (Def: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6)"
+  echo "  -w|--work-dir   : Docker buildx command work dir path"
+  echo "  -t|--git-tag    : Name for git tag to create (Required)"
+  echo "  --mark-latest   : Marks the latest image to given tag"
+  echo "  --push-images   : Enables pushing of docker images to docker hub"
+  echo "  --push-git-tags : Enabled push of git tags to git remote origin"
+  echo "  --no-cache      : Avoid use of docker build cache"
+  echo "  -h|--help       : Prints this help menu"
+  exit 1
 }
 
-# lets display usage and exit here if first parameter is help
-[[ "$1" == "help" ]] && usage
-
-# error check function
-errCheck(){
-    # $1 = errocode
-    # $2 = msg
-    # $3 = exit on fail
-    if [ "$?" != "0" ]
-        then
-            echo "ERR| $2"
-            # if $3 is set then exit with errorcode
-            [[ $3 ]] && exit $1
-    fi
+__processParams() {
+  extraDockerArgs=""
+  imageTags=""
+  while [ "$1" != "" ]; do
+    case $1 in
+      -i|--image-name) shift
+                       [[ ! $1 ]] && __usage "Image name is missing"
+                       image="$1"
+                       ;;
+      -p|--platforms)  shift
+                       [[ ! $1 ]] && __usage "Platforms list missing"
+                       platforms="$1"
+                       ;;
+      -w|--work-dir)   shift
+                       [[ ! $1 ]] && __usage "Work dir path missing"
+                       workDir="$1"
+                       ;;
+      -t|--git-tag)    shift
+                       [[ ! $1 ]] && __usage "Git tag name missing"
+                       tagName="$(echo $1\
+                       |sed -e 's/^[ \t]*//;s/[ \t]*$//;s/ /-/g'\
+                       |sed $'s/[^[:print:]\t]//g')"
+                       imageTags+=" $tagName"
+                       ;;
+      --mark-latest)   latestImage=yes
+                       imageTags+=" latest"
+                       ;;
+      --push-images)   imgPush=yes
+                       ;;
+      --push-git-tags) tagPush=yes
+                       ;;
+      --no-cache)      extraDockerArgs+=" --no-cache"
+                       ;;
+      -h|--help)       __usage
+                       ;;
+      * )              __usage "Missing or incorrect parameters"
+    esac
+    shift
+  done
+  [[ ! $platforms ]] && \
+  platforms="linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6"
+  [[ ! $imgPush ]] && imgPush=no
+  [[ ! $tagPush ]] && tagPush=no
+  [[ ! $tagName ]] && __usage "Work dir path missing"
+  [[ ! $workDir ]] && workDir=$(pwd)
+  [[ ! $image ]] && image=$(basename $(pwd))
 }
 
-# Docker Build function
-dockerBuild(){
-    # $1 = image type
-
-    # Lets set appropriate tags based on buildType
-    [[ "$1" == "command" ]] && imageTag=latest
-    [[ "$1" == "shell" ]] && imageTag=shell-latest
-    echo "INFO: Building $1 Image: $image:$imageTag ... (may take a while)"
-    echo "      Logs are redirected to $logFile"
-    docker build -t $image:$imageTag $1/>$1-$logFile 2>&1
-    errCheck "$?" "Docker Build failed, please check $logfile" "exitOnFail"
-    
-    # Lets identify awscli command version and setup image tags
-    awscliVer=$(docker run --rm -it $image:$imageTag --version|awk -F '[ /]' '{ print $2 }')
-
-    # Lets set awscli version tag based on buildType
-    [[ "$1" == "command" ]] && verTag=$awscliVer
-    [[ "$1" == "shell" ]] && verTag=shell-$awscliVer
-
-    if [[ $awscliVer == *.*.* ]]
-        then
-            echo "INFO: Creating tags..."
-            docker tag $image $image:$verTag >/dev/null 2>&1
-            errCheck "$?" "Tag creation failed"
-        else
-            echo "WARN: Could not determine awscli version, ignoring tagging..."
-    fi
-
-    # Lets create git tag and do checkin
-    if [[ $awscliVer == *.*.* ]]
-        then
-            echo "INFO: Creating/Updating git tag"
-            git tag -d $verTag| sed 's/^/| GIT: /'
-            git tag $verTag| sed 's/^/| GIT: /'
-            git push origin --tags| sed 's/^/| GIT: /'
-    fi
+__errCheck(){
+  # $1 = errocode
+  # $2 = msg
+  [[ "$1" != "0" ]] && echo "ERR: $2" && exit $1
 }
 
-##############
-## Validations
-##############
+__dockerBuild(){
+  # $1 = image name e.g. "satishweb/imagename"
+  # $2 = image tags e.g. "latest 1.1.1"
+  # $3 = platforms e.g. "linux/amd64,linux/arm64"
+  # $4 = work dir path
+  # $5 = Extra args for docker buildx command
 
-! [[ "$buildType" =~ ^(command|shell)$ ]] && buildType=all
-! [[ "$ImagePush" =~ ^(manual|auto)$ ]] && imgPush=manual
+  tagParams=""
+  for i in $2; do tagParams+=" -t $1:$i"; done
+  docker buildx build --platform "$3" $5 $tagParams $4
+  __errCheck "$?" "Docker Build failed"
+}
 
-##############
-## Main method
-##############
+__validations() {
+  ! [[ "$imgPush" =~ ^(yes|no)$ ]] && imgPush=no
+  ! [[ "$tagPush" =~ ^(yes|no)$ ]] && tagPush=no
 
-# Head
-echo "INFO: Build Type: $buildType"
-echo "INFO: Image Push $ImagePush"
-echo "NOTE: Execute \"$0 help\" to know parameters list"
-echo "------------------------------------------------"
-# Lets do git pull
-echo "INFO: Fetching latest codebase changes"
-git checkout master| sed 's/^/| GIT: /'
-git pull | sed 's/^/| GIT: /'
+  # Check for buildx env
+  if [[ "$(docker buildx ls\
+           |grep -e " *default*.*running linux/amd64"\
+           |wc -l\
+          )" -lt "1" ]]; then
+    __errCheck "1" "Docker buildx env is not setup, please fix it"
+  fi
+}
 
-# Lets prepare docker image
-echo "INFO: Removing all tags of image $image ..."
-docker rmi -f $(docker images|grep "$image"|awk '{print $1":"$2}') >/dev/null 2>&1
-errCheck "$?" "Docker images removal failed" "exitOnFail"
-if [[ "$buildType" != "all" ]]
-    then
-        dockerBuild $BuildType
-    else
-        dockerBuild command
-        dockerBuild shell
-fi
+__checkSource() {
+  # Lets do git pull if push is enabled
+  if [[ "$imgPush" == "yes" ]]; then
+    git checkout master >/dev/null 2>&1
+    __errCheck "$?" "Git checkout to master branch failed..."
+    git pull >/dev/null 2>&1
+    __errCheck "$?" "Git pull for master branch failed..."
+  fi
+}
 
-# Lets do manual push to docker.
-# To be used only if docker automated build process is failed
-if [[ "$1" == "manual" ]]
-    then
-        echo "INFO: Logging in to Docker HUB... (Interactive Mode)"
-        docker login
-        errCheck "$?" "Docker login failed..." "exitOnFail"
-        echo "INFO: Pushing build to Docker HUB..."
-        docker push $image
-        errCheck "$?" "Docker push failed..." "exitOnFail"
-fi
+__setupDocker() {
+  # Lets prepare docker image
+  if [[ "$imgPush" == "yes" ]]; then
+    echo "INFO: Logging in to Docker HUB... (Interactive Mode)"
+    docker login 2>&1 | sed 's/^/INFO: DOCKER: /g'
+    __errCheck "$?" "Docker login failed..."
+    extraDockerArgs+=" --push"
+  fi
+  docker buildx create --name builder >/dev/null 2>&1
+  docker buildx use builder >/dev/null 2>&1
+  __errCheck "$?" "Could not use docker buildx default runner..."
+}
+
+__createGitTag() {
+  # Lets create git tag
+  echo "INFO: Creating local git tag: $tagName"
+  git tag -d $tagName >/dev/null 2>&1
+  git tag $tagName >/dev/null 2>&1
+  if [[ "$tagPush" == "yes" ]]; then
+    echo "INFO: Pushing git tag to remote: $tagName"
+    git push --delete origin $tagName >/dev/null 2>&1
+    git push -f origin $tagName >/dev/null 2>&1
+  fi
+}
+
+## Main
+__processParams $@
+__validations
+__checkSource
+__setupDocker
+
+# Lets identify current unbound version and setup image tags
+
+echo "INFO: Building Docker Images (may take a while)"
+echo "INFO: Docker image      : $image"
+echo "INFO: Platforms         : $platforms"
+echo "INFO: Docker image tags : $imageTags"
+echo "INFO: Image tags push?  : $imgPush"
+echo "INFO: Git tags          : $tagName"
+echo "INFO: Git tags push?    : $tagPush"
+__dockerBuild $image "$imageTags" "$platforms" "$workDir" "$extraDockerArgs"
+__createGitTag $tagName

@@ -2,6 +2,14 @@
 **********
 Simple and lightweight ubuntu based Docker Image for Amazon web services command line tool (awscli)
 
+### Supported Platforms ###
+***********
+Platforms |
+--------------- |
+linux/amd64 |
+linux/arm64 |
+linux/arm/v7 |
+
 ### Docker Image Types ###
 ***********
 Image Type  | Tag prefix | Usage
