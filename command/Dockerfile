@@ -12,8 +12,8 @@ MAINTAINER Satish Gaikwad <satish@satishweb.com>
 # This helps in keeping image size smaller as we clean unwanted files in same RUN command.
 # There is nothing tangible in these commands that can be used in new Dockerfiles that depends on this image.
 RUN apt-get -y update \
-	# Lets install base packages required for awscli
-	&& apt-get install -y python python-pip ca-certificates locales\
+	# Lets install base packages required for awscli + jq
+	&& apt-get install -y python python-pip ca-certificates locales jq\
 	# Lets setup locale for this shell
 	&& locale-gen en_US.UTF-8 \
 	&& export LC_ALL=en_US.UTF-8 \
