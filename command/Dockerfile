@@ -13,7 +13,7 @@ MAINTAINER Satish Gaikwad <satish@satishweb.com>
 # There is nothing tangible in these commands that can be used in new Dockerfiles that depends on this image.
 RUN apt-get -y update \
 	# Lets install base packages required for awscli + jq
-	&& apt-get install -y python python-pip ca-certificates locales jq\
+	&& apt-get install -y python3 python3-pip ca-certificates locales jq\
 	# Lets setup locale for this shell
 	&& locale-gen en_US.UTF-8 \
 	&& export LC_ALL=en_US.UTF-8 \
@@ -22,7 +22,7 @@ RUN apt-get -y update \
 	&& echo "export LC_ALL=en_US.UTF-8">>/etc/profile \
 	&& echo "export LANG=en_US.UTF-8">>/etc/profile \
 	# Lets install awscli latest version
-	&& pip install awscli \
+	&& pip3 install awscli \
 	# Lets uninstall build tools that are no longer required for awscli.
 	# Note: If you intend to run pip command inside container later, it will not work without build-essential packages.
 	# If you intend to upgrade awscli package, please pull latest awscli docker image from docker hub using docker pull command.
@@ -30,8 +30,8 @@ RUN apt-get -y update \
 	# Remove auto installed unwanted packages post build-essential package bundle removal
 	&& apt-get -qy autoremove --purge \
 	# Removing devel packages, few MBs less :)
-	&& dpkg --purge libpython-all-dev libpython-dev python-all-dev python-dev python-pip python-pip-whl python-setuptools python2.7-dev \
-	# Lets remove all downloaded packages from cache. This reduces image size significantly.
+	&& dpkg --purge libpython-all-dev libpython-dev python-all-dev python-pip-whl python3-pip python3-wheel python3-setuptools python3-dev \
+        # Lets remove all downloaded packages from cache. This reduces image size significantly.
 	# Note: Docker should remove it on its own however no harm having this command here
 	&& rm -rf /var/cache/apt/archives/*deb \
 	# Lets create the entrypoint script to handle switch between invoking of default bash shell and aws command execution. 
