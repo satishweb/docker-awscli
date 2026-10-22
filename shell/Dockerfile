@@ -1,18 +1,19 @@
 #!/bin/bash
-# Ubuntu + awscli Docker image
-# Type: Shell Access Based (Opens bash shell)
-# Use: Generally used to run for scripts or automation tools usages
 # Author: Satish Gaikwad <satish@satishweb.com>
-
-# To know contents of awscli Dockerfile, please open source repository on github for this docker image.
-# Docker hub somehow can not understand how to handle multiple Dockerfiles for display on the Docker hub image page.
+#
+# The image opens a shell, the command of aws is in it. It is made from the
+# image with the command, so the command is the same in both of them.
 FROM satishweb/awscli:draft-latest
-MAINTAINER Satish Gaikwad <satish@satishweb.com>
+LABEL maintainer="Satish Gaikwad <satish@satishweb.com>"
 
-# Lets modify entrypoint.sh to remove aws command reference.
-RUN echo '#!/bin/bash'>/opt/entrypoint.sh \
-	&& echo 'set -e	&& exec "$@"' >>/opt/entrypoint.sh
-    
-# We are just running default command to open shell for scripted/automated use of awscli
+USER root
+
+COPY --chmod=0755 shell/entrypoint.sh /opt/entrypoint.sh
+
+# The container runs with the same user as the image it is made from.
+USER ubuntu
+WORKDIR /home/ubuntu
+
+# The entrypoint runs the command that is given to the container.
 ENTRYPOINT ["/opt/entrypoint.sh"]
 CMD ["/bin/bash"]

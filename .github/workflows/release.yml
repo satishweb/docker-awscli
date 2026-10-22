@@ -1,0 +1,263 @@
+# Build and publish the images for a release tag.
+#
+# The tag has to have the form v<version> or <version>, for example
+# v1.46.2. The version is the version of the command of aws that is
+# installed in the image.
+#
+# The image with the command is published first, the image with the shell is
+# made from it. Both of them are published to the Docker Hub and to the
+# GitHub container registry. A release can only be cut from a commit that
+# was built, tested and scanned.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]*"
+      - "[0-9]*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The release tag, for example v1.46.2"
+        required: true
+        type: string
+      dry_run:
+        description: "Build the images without publishing them"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+  packages: write
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY_DOCKERHUB: docker.io
+  REGISTRY_GHCR: ghcr.io
+  IMAGE_NAME: awscli
+  DOCKERHUB_OWNER: satishweb
+
+jobs:
+  gate:
+    name: Check the build of the branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: The CI workflow has to have passed for this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          echo "Looking for a successful CI run for ${COMMIT}."
+          conclusion=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${COMMIT}&status=completed&per_page=20" \
+            --jq '[.workflow_runs[].conclusion] | if index("success") then "success" else "none" end')
+          if [ "${conclusion}" != "success" ]; then
+            echo "::error::The CI workflow did not pass for ${COMMIT}. A release can only be cut from a commit that was built and tested on the branch."
+            exit 1
+          fi
+          echo "The CI workflow passed for ${COMMIT}."
+
+  verify:
+    name: Verify the images
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve the release
+        id: release
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          tag="${RELEASE_TAG}"
+          if [[ ! "${tag}" =~ ^v?([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::The tag ${tag} does not have the expected form v<version>."
+            exit 1
+          fi
+          echo "version=${BASH_REMATCH[1]}" >> "${GITHUB_OUTPUT}"
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the image with the command
+        run: |
+          docker build \
+            -f command/Dockerfile \
+            --build-arg "AWSCLI_VERSION=${{ steps.release.outputs.version }}" \
+            -t satishweb/awscli:draft-latest .
+
+      - name: Scan the image with the command for vulnerabilities and secrets
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: satishweb/awscli:draft-latest
+          format: table
+          output: /tmp/trivy-command.txt
+          scanners: vuln,secret
+          vuln-type: os
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          trivyignores: .trivyignore
+
+      - name: Show the result of the scan
+        if: always()
+        run: cat /tmp/trivy-command.txt
+
+      - name: Test the image with the command
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r tests/requirements.txt
+          python tests/test-awscli.py --image satishweb/awscli:draft-latest --kind command
+
+      - name: Build the image with the shell
+        run: docker build -f shell/Dockerfile -t satishweb/docker-awscli:ci .
+
+      - name: Scan the image with the shell for vulnerabilities and secrets
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: satishweb/docker-awscli:ci
+          format: table
+          output: /tmp/trivy-shell.txt
+          scanners: vuln,secret
+          vuln-type: os
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          trivyignores: .trivyignore
+
+      - name: Show the result of the scan
+        if: always()
+        run: cat /tmp/trivy-shell.txt
+
+      - name: Test the image with the shell
+        run: python tests/test-awscli.py --image satishweb/docker-awscli:ci --kind shell
+
+  publish:
+    name: Publish
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve the release
+        id: release
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          tag="${RELEASE_TAG}"
+          if [[ ! "${tag}" =~ ^v?([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::The tag ${tag} does not have the expected form v<version>."
+            exit 1
+          fi
+          version="${BASH_REMATCH[1]}"
+          echo "The version of the command of aws is ${version}."
+          {
+            echo "version=${version}"
+            echo "command_tags<<EOF"
+            echo "${REGISTRY_DOCKERHUB}/${DOCKERHUB_OWNER}/${IMAGE_NAME}:${tag}"
+            echo "${REGISTRY_DOCKERHUB}/${DOCKERHUB_OWNER}/${IMAGE_NAME}:${version}"
+            echo "${REGISTRY_DOCKERHUB}/${DOCKERHUB_OWNER}/${IMAGE_NAME}:latest"
+            echo "${REGISTRY_DOCKERHUB}/${DOCKERHUB_OWNER}/${IMAGE_NAME}:draft-latest"
+            echo "${REGISTRY_GHCR}/${GITHUB_REPOSITORY_OWNER}/${IMAGE_NAME}:${tag}"
+            echo "${REGISTRY_GHCR}/${GITHUB_REPOSITORY_OWNER}/${IMAGE_NAME}:${version}"
+            echo "${REGISTRY_GHCR}/${GITHUB_REPOSITORY_OWNER}/${IMAGE_NAME}:latest"
+            echo "EOF"
+            echo "shell_tags<<EOF"
+            echo "${REGISTRY_DOCKERHUB}/${DOCKERHUB_OWNER}/${IMAGE_NAME}:shell-${tag}"
+            echo "${REGISTRY_DOCKERHUB}/${DOCKERHUB_OWNER}/${IMAGE_NAME}:shell-${version}"
+            echo "${REGISTRY_DOCKERHUB}/${DOCKERHUB_OWNER}/${IMAGE_NAME}:shell-latest"
+            echo "${REGISTRY_DOCKERHUB}/${DOCKERHUB_OWNER}/${IMAGE_NAME}:draft-shell-latest"
+            echo "${REGISTRY_GHCR}/${GITHUB_REPOSITORY_OWNER}/${IMAGE_NAME}:shell-${tag}"
+            echo "${REGISTRY_GHCR}/${GITHUB_REPOSITORY_OWNER}/${IMAGE_NAME}:shell-${version}"
+            echo "${REGISTRY_GHCR}/${GITHUB_REPOSITORY_OWNER}/${IMAGE_NAME}:shell-latest"
+            echo "EOF"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the Docker Hub
+        if: ${{ !inputs.dry_run }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Log in to the GitHub container registry
+        if: ${{ !inputs.dry_run }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY_GHCR }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish the image with the command
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: command/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            AWSCLI_VERSION=${{ steps.release.outputs.version }}
+          push: ${{ !inputs.dry_run }}
+          tags: ${{ steps.release.outputs.command_tags }}
+          provenance: true
+          labels: |
+            org.opencontainers.image.title=AWS CLI
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.release.outputs.version }}
+
+      - name: Build and publish the image with the shell
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: shell/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ !inputs.dry_run }}
+          tags: ${{ steps.release.outputs.shell_tags }}
+          provenance: true
+          labels: |
+            org.opencontainers.image.title=AWS CLI with a shell
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.release.outputs.version }}
+
+  release:
+    name: GitHub release
+    needs: publish
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
+    permissions:
+      contents: write
+    steps:
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "The release ${TAG} exists already, its notes are updated."
+            gh release edit "${TAG}" --title "${TAG}" --generate-notes
+          else
+            gh release create "${TAG}" --title "${TAG}" --generate-notes
+          fi
