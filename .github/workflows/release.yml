@@ -219,7 +219,7 @@ jobs:
             AWSCLI_VERSION=${{ steps.release.outputs.version }}
           push: ${{ !inputs.dry_run }}
           tags: ${{ steps.release.outputs.command_tags }}
-          provenance: true
+          provenance: false
           labels: |
             org.opencontainers.image.title=AWS CLI
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
@@ -234,7 +234,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: ${{ !inputs.dry_run }}
           tags: ${{ steps.release.outputs.shell_tags }}
-          provenance: true
+          provenance: false
           labels: |
             org.opencontainers.image.title=AWS CLI with a shell
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
