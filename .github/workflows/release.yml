@@ -219,7 +219,7 @@ jobs:
           while IFS= read -r tag; do
             [ -n "$tag" ] && args+=(-t "$tag")
           done <<< "$tags"
-          docker buildx build --push --platform linux/amd64 -f command/Dockerfile "${args[@]}" .
+          docker buildx build --push --provenance=false --platform linux/amd64 -f command/Dockerfile "${args[@]}" .
       - name: Build and publish
         run: |
           set -euo pipefail
@@ -228,7 +228,7 @@ jobs:
           while IFS= read -r tag; do
             [ -n "$tag" ] && args+=(-t "$tag")
           done <<< "$tags"
-          docker buildx build --push --platform linux/amd64 -f shell/Dockerfile "${args[@]}" .
+          docker buildx build --push --provenance=false --platform linux/amd64 -f shell/Dockerfile "${args[@]}" .
   release:
     name: GitHub release
     needs: publish
