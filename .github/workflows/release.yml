@@ -211,36 +211,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and publish the image with the command
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: command/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          build-args: |
-            AWSCLI_VERSION=${{ steps.release.outputs.version }}
-          push: true
-          tags: ${{ steps.release.outputs.command_tags }}
-          labels: |
-            org.opencontainers.image.title=AWS CLI
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ steps.release.outputs.version }}
-
-      - name: Build and publish the image with the shell
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: shell/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.release.outputs.shell_tags }}
-          labels: |
-            org.opencontainers.image.title=AWS CLI with a shell
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ steps.release.outputs.version }}
-
+      - name: Build and publish
+        run: |
+          set -euo pipefail
+          tags="${{ steps.release.outputs.tags }}"
+          args=()
+          while IFS= read -r tag; do
+            [ -n "$tag" ] && args+=(-t "$tag")
+          done <<< "$tags"
+          docker buildx build --push --platform linux/amd64 -f command/Dockerfile "${args[@]}" .
+      - name: Build and publish
+        run: |
+          set -euo pipefail
+          tags="${{ steps.release.outputs.tags }}"
+          args=()
+          while IFS= read -r tag; do
+            [ -n "$tag" ] && args+=(-t "$tag")
+          done <<< "$tags"
+          docker buildx build --push --platform linux/amd64 -f shell/Dockerfile "${args[@]}" .
   release:
     name: GitHub release
     needs: publish
