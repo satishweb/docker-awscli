@@ -72,6 +72,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+        fetch-depth: 0
       - name: Resolve the release
         id: release
         env:
@@ -152,6 +153,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+        fetch-depth: 0
       - name: Resolve the release
         id: release
         env:
@@ -217,9 +219,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           build-args: |
             AWSCLI_VERSION=${{ steps.release.outputs.version }}
-          push: ${{ !inputs.dry_run }}
+          push: true
           tags: ${{ steps.release.outputs.command_tags }}
-          provenance: false
           labels: |
             org.opencontainers.image.title=AWS CLI
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
@@ -232,9 +233,8 @@ jobs:
           context: .
           file: shell/Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: ${{ !inputs.dry_run }}
+          push: true
           tags: ${{ steps.release.outputs.shell_tags }}
-          provenance: false
           labels: |
             org.opencontainers.image.title=AWS CLI with a shell
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
