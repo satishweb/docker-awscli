@@ -3,10 +3,10 @@
 #
 # Type: Command Based (Direct command execution upon container launch)
 # Use: Manual commandline purpose
-FROM ubuntu:24.04
+FROM ubuntu:26.04
 LABEL maintainer="Satish Gaikwad <satish@satishweb.com>"
 
-ARG AWSCLI_VERSION=1.46.2
+ARG AWSCLI_VERSION=1.46.3
 
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=en_US.UTF-8 \
