@@ -3,7 +3,11 @@
 #
 # The image opens a shell, the command of aws is in it. It is made from the
 # image with the command, so the command is the same in both of them.
-FROM satishweb/awscli:draft-latest
+#
+# The image of the command is given with the argument, the local build uses
+# the tag the Makefile builds, the CI build passes the tag it has just built.
+ARG BASE_IMAGE=satishweb/awscli:draft-latest
+FROM ${BASE_IMAGE}
 LABEL maintainer="Satish Gaikwad <satish@satishweb.com>"
 
 USER root
